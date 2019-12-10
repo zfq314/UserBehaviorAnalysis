@@ -2,8 +2,11 @@ package com.atguigu.hotitems_analysis
 
 
 import java.sql.Timestamp
+import java.util.Properties
 
+import com.atguigu.hotitems_analysis.pojo.{ItemViewCount, UserBehavior}
 import org.apache.flink.api.common.functions.AggregateFunction
+import org.apache.flink.api.common.serialization.SimpleStringSchema
 import org.apache.flink.api.common.state.{ListState, ListStateDescriptor}
 import org.apache.flink.api.java.tuple.{Tuple, Tuple1}
 import org.apache.flink.configuration.Configuration
@@ -13,14 +16,11 @@ import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.api.scala.function.WindowFunction
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow
+import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer
 import org.apache.flink.util.Collector
 
 import scala.collection.mutable.ListBuffer
 
-//输入数据的样例类
-case class UserBehavior(userId: Long, itemId: Long, categoryId: Int, behavior: String, timestamp: Long)
-
-case class ItemViewCount(itemId: Long, windowEnd: Long, count: Long)
 
 object HotItems {
 	def main(args: Array[String]): Unit = {
@@ -30,14 +30,26 @@ object HotItems {
 		env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 		//设置并行度 为了打印到控制台的结果不乱序，我们配置全局的并发为1，这里改变并发对结果正确性没有影响
 		env.setParallelism(1)
+
+		//设置kafka的配置信息
+		val properties = new Properties()
+		//集群地址
+		properties.setProperty("bootstrap.servers", "hadoop102:9092")
+		properties.setProperty("group.id", "consumer-group")
+		properties.setProperty("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer")
+		properties.setProperty("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer")
+		properties.setProperty("auto.offset.reset", "latest")
 		//读取数据，进行预处理
-		val dataStream = env.readTextFile("Data/UserBehavior.csv").map(
-			data => {
-				val dataArray: Array[String] = data.split(",")
-				UserBehavior(dataArray(0).toLong, dataArray(1).toLong,
-					dataArray(2).toInt, dataArray(3), dataArray(4).toLong)
-			}
-		) // 指定时间戳和watermark
+		//val dataStream = env.readTextFile("Data/UserBehavior.csv")
+		//修改数据源头，从kafka中读取数据
+		val dataStream = env.addSource(new FlinkKafkaConsumer[String]
+		("hotitem", new SimpleStringSchema(), properties))
+			.map(
+				data => {
+					val dataArray: Array[String] = data.split(",")
+					UserBehavior(dataArray(0).toLong, dataArray(1).toLong, dataArray(2).toInt, dataArray(3), dataArray(4).toLong)
+				}
+			) // 指定时间戳和watermark
 			.assignAscendingTimestamps(_.timestamp * 1000L)
 		//分组聚合，分组排序输出
 		val processSteam = dataStream
@@ -72,12 +84,13 @@ class CountAgg() extends AggregateFunction[UserBehavior, Long, Long] {
 class Average() extends AggregateFunction[UserBehavior, (Long, Int), Double] {
 	override def createAccumulator(): (Long, Int) = (0L, 0)
 
-	override def add(value: UserBehavior, accumulator: (Long, Int)): (Long,
-		Int) = ???
+	override def add(value: UserBehavior, accumulator: (Long, Int)): (Long, Int) = {
+		(value.timestamp + accumulator._1, accumulator._2 + 1)
+	}
 
-	override def getResult(accumulator: (Long, Int)): Double = ???
+	override def getResult(accumulator: (Long, Int)): Double = accumulator._1 / accumulator._2.toDouble
 
-	override def merge(a: (Long, Int), b: (Long, Int)): (Long, Int) = ???
+	override def merge(a: (Long, Int), b: (Long, Int)): (Long, Int) = (a._1 + b._1, a._2 + b._2)
 }
 
 //WindowFunction将每个key每个窗口聚合后的结果带上其他信息进行输出。我们这里实现的WindowResultFunction将<主键商品ID，窗口，点击量>封装成了ItemViewCount进行输出。
