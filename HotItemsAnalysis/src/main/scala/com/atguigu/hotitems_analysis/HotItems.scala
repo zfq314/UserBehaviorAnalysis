@@ -42,7 +42,8 @@ object HotItems {
 		//读取数据，进行预处理
 		//val dataStream = env.readTextFile("Data/UserBehavior.csv")
 		//修改数据源头，从kafka中读取数据
-		val dataStream = env.addSource(new FlinkKafkaConsumer[String]("hotitem", new SimpleStringSchema(), properties))
+		val dataStream = env.addSource(new FlinkKafkaConsumer[String]
+		("hotitem", new SimpleStringSchema(), properties))
 			.map(
 				data => {
 					val dataArray: Array[String] = data.split(",")
