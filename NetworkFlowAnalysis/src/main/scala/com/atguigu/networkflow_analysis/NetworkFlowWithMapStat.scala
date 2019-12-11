@@ -7,6 +7,7 @@ import org.apache.flink.streaming.api.scala._
 
 
 object NetworkFlowWithMapStat {
+	//优化，用MapStat将功能实现
 	def main(args: Array[String]): Unit = {
 		val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
 		//便于查看打印信息设置并行度
