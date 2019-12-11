@@ -42,11 +42,12 @@ object HotItems {
 		//读取数据，进行预处理
 		//val dataStream = env.readTextFile("Data/UserBehavior.csv")
 		//修改数据源头，从kafka中读取数据
-		val dataStream = env.addSource(new FlinkKafkaConsumer[String]
-		("hotitem", new SimpleStringSchema(), properties))
+		val dataStream = env.addSource(new FlinkKafkaConsumer[String]("hotitem", new SimpleStringSchema(), properties))
 			.map(
 				data => {
 					val dataArray: Array[String] = data.split(",")
+					//userId:long itemId:long categoryId:int hehavior:string
+					// timestamp logn
 					UserBehavior(dataArray(0).toLong, dataArray(1).toLong, dataArray(2).toInt, dataArray(3), dataArray(4).toLong)
 				}
 			) // 指定时间戳和watermark
@@ -60,7 +61,6 @@ object HotItems {
 			//计数器又状态，这个算子是一个有状态的算子
 			//做增量的聚合操作，它能使用AggregateFunction提前聚合掉数据，减少state的存储压力。
 			.aggregate(new CountAgg(), new WindowCountResult())
-			//
 			.keyBy(_.windowEnd)
 			.process(new TopNHotItems(3))
 		processSteam.print()
@@ -80,7 +80,7 @@ class CountAgg() extends AggregateFunction[UserBehavior, Long, Long] {
 	override def merge(a: Long, b: Long): Long = a + b
 }
 
-// 求时间戳的平均数
+// 求时间戳的平均数,未使用
 class Average() extends AggregateFunction[UserBehavior, (Long, Int), Double] {
 	override def createAccumulator(): (Long, Int) = (0L, 0)
 
@@ -123,7 +123,7 @@ class TopNHotItems(topSize: Int) extends KeyedProcessFunction[Long,
 	override def processElement(value: ItemViewCount, ctx: KeyedProcessFunction[Long, ItemViewCount, String]#Context, out: Collector[String]): Unit = {
 		//每条数据存入listState
 		itemViewState.add(value)
-		//注册定时器
+		//注册定时器，每个key都是相同的
 		ctx.timerService().registerEventTimeTimer(value.windowEnd + 1)
 	}
 
@@ -132,6 +132,7 @@ class TopNHotItems(topSize: Int) extends KeyedProcessFunction[Long,
 		//为了排序，获取所有的状态数据放入list中
 		var allItemCounts: ListBuffer[ItemViewCount] = ListBuffer()
 		import scala.collection.JavaConversions._
+		// <-scala的遍历方式 ，itemViewState.get()Java的类型，所以要导入上面的包
 		for (state <- itemViewState.get()) {
 			allItemCounts += state
 		}
