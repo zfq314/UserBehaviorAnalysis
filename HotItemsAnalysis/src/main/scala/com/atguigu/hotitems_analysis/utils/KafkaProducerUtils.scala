@@ -3,7 +3,7 @@ package com.atguigu.hotitems_analysis.utils
 import java.util.Properties
 
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
-
+import scala._
 import scala.io.BufferedSource
 
 /**

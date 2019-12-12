@@ -18,6 +18,7 @@
         <flink.version>1.7.2</flink.version>
         <scala.binary.version>2.11</scala.binary.version>
         <kafka.version>2.2.0</kafka.version>
+        <hadoop.version>2.7.2</hadoop.version>
     </properties>
     <dependencies>
         <dependency>
@@ -41,6 +42,17 @@
             <artifactId>flink-connector-kafka_${scala.binary.version}
             </artifactId>
             <version>${flink.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-hadoop-compatibility_2.11</artifactId>
+            <version>${flink.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-client</artifactId>
+            <version>${hadoop.version}</version>
         </dependency>
 
 
