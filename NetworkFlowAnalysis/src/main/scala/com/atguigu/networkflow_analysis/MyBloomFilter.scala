@@ -16,8 +16,7 @@ object MyBloomFilter {
 		val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
 		env.setParallelism(1)
 		env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
-		//val dataStream: DataStream[String] = env.readTextFile
-		("Data/UserBehavior.csv")
+		//val dataStream: DataStream[String] = env.readTextFile("Data/UserBehavior.csv")
 
 		val dataStreams = env.readTextFile("Data/UserBehavior.csv")
 			.map(
